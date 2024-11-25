@@ -240,13 +240,37 @@ class NNetWrapper:
 
         if args.cuda:
             self.nnet.cuda()
+        
+        # Initialize optimizer
+        self.optimizer = optim.Adam(self.nnet.parameters(), lr=args.max_lr)
+        
+        # 1cycle learning rate parameters
+        self.total_steps = args.numIters * args.epochs * (args.maxlenOfQueue // args.batch_size)
+        self.current_step = 0
+
+    def get_learning_rate(self):
+        """Implement 1cycle learning rate strategy"""
+        if self.current_step >= self.total_steps:
+            return self.args.min_lr
+        
+        # Divide the total steps into two phases
+        half_cycle = self.total_steps // 2
+        
+        if self.current_step <= half_cycle:
+            # First phase: increase from min_lr to max_lr
+            phase = self.current_step / half_cycle
+            lr = self.args.min_lr + (self.args.max_lr - self.args.min_lr) * phase
+        else:
+            # Second phase: decrease from max_lr to min_lr
+            phase = (self.current_step - half_cycle) / half_cycle
+            lr = self.args.max_lr - (self.args.max_lr - self.args.min_lr) * phase
+        
+        return lr
 
     def train(self, examples):
         """
         examples: list of examples, each example is of form (board, pi, v)
         """
-        optimizer = optim.Adam(self.nnet.parameters(), lr=self.args.lr)
-
         for epoch in range(self.args.epochs):
             print("EPOCH ::: " + str(epoch + 1))
             self.nnet.train()
@@ -257,21 +281,20 @@ class NNetWrapper:
 
             t = tqdm(range(batch_count), desc="Training Net")
             for _ in t:
+                # Update learning rate
+                lr = self.get_learning_rate()
+                for param_group in self.optimizer.param_groups:
+                    param_group['lr'] = lr
+                self.current_step += 1
+
                 sample_ids = np.random.randint(len(examples), size=self.args.batch_size)
                 boards, pis, vs = list(zip(*[examples[i] for i in sample_ids]))
-                boards = torch.FloatTensor(
-                    np.array(boards).astype(np.float32)
-                )  # np.float32 or np.float64 have a difference?
+                boards = torch.FloatTensor(np.array(boards).astype(np.float32))
                 target_pis = torch.FloatTensor(np.array(pis))
                 target_vs = torch.FloatTensor(np.array(vs).astype(np.float32))
 
                 if self.args.cuda:
-                    # boards, target_pis, target_vs = boards.contiguous().cuda(), target_pis.contiguous().cuda(), target_vs.contiguous().cuda()
-                    boards, target_pis, target_vs = (
-                        boards.cuda(),
-                        target_pis.cuda(),
-                        target_vs.cuda(),
-                    )
+                    boards, target_pis, target_vs = boards.cuda(), target_pis.cuda(), target_vs.cuda()
 
                 # compute output
                 out_pi, out_v = self.nnet(boards)
@@ -282,10 +305,10 @@ class NNetWrapper:
                 # record loss
                 pi_losses.update(l_pi.item(), boards.size(0))
                 v_losses.update(l_v.item(), boards.size(0))
-                t.set_postfix(Loss_pi=pi_losses, Loss_v=v_losses)
+                t.set_postfix(Loss_pi=pi_losses, Loss_v=v_losses, lr=f"{lr:.1e}")
 
                 # compute gradient and do SGD step
-                optimizer.zero_grad()
+                self.optimizer.zero_grad()
                 total_loss.backward()
                 
                 # Add gradient clipping
@@ -491,25 +514,28 @@ class dotdict(dict):
 
 args = dotdict(
     {
-        "lr": 0.001,
+        "lr": 0.01,
         "dropout": 0.1,
         "epochs": 10,
-        "batch_size": 64,
+        "batch_size": 256,
         "cuda": torch.cuda.is_available(),
         "num_channels": 512,
         "numIters": 200,
         "numEps": 100,  # Number of complete self-play games to simulate during a new iteration.
         "tempThreshold": 15,  #
-        "updateThreshold": 0.6,  # During arena playoff, new neural net will be accepted if threshold ratio or more of games are won.
+        "updateThreshold": 0.55,  # During arena playoff, new neural net will be accepted if threshold ratio or more of games are won.
         "maxlenOfQueue": 200000,  # Number of game examples to train the neural networks.
         "numItersForTrainExamplesHistory": 20,
-        "numMCTSSims": 25,  # Number of games moves for MCTS to simulate.
+        "numMCTSSims": 400,  # Number of games moves for MCTS to simulate.
         "arenaCompare": 40,  # Number of games to play during arena play to determine if new net will be accepted.
         "cpuct": 1,
         "checkpoint": "./temp/",
         "load_model": False,
         "load_folder_file": ("./temp/", "best.pth.tar"),
-        "board_size": 15,  # 15 x 15
+        "board_size": 9,  # 9x9
+        "min_lr": 1e-4,           # Minimum learning rate
+        "max_lr": 1e-2,           # Maximum learning rate
+        "grad_clip": 1.0,         # Gradient clipping threshold
     }
 )
 
@@ -519,7 +545,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--train", action="store_true")
-    parser.add_argument("--board_size", type=int, default=6)
+    parser.add_argument("--board_size", type=int, default=9)
     # play arguments
     parser.add_argument("--play", action="store_true")
     parser.add_argument("--verbose", action="store_true")
@@ -537,6 +563,11 @@ def main():
         choices=["human", "random", "greedy", "alphazero"],
     )
     parser.add_argument("--ckpt_file", type=str, default="best.pth.tar")
+    parser.add_argument("--wandb", action="store_true", help="Use wandb to record the training process")
+    parser.add_argument("--wandb_project", type=str, default="alphazero-gomoku", help="wandb project name")
+    parser.add_argument("--wandb_entity", type=str, default=None, help="wandb entity name")
+    parser.add_argument("--wandb_id", type=str, default=None)
+    
     args_input = vars(parser.parse_args())
     for k, v in args_input.items():
         args[k] = v
