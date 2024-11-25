@@ -1,2 +1,10 @@
 __pycache__
 .DS_Store
+wandb/
+temp/
+.cursorignore
+output.txt
+*.pth
+*.pt
+*.pth.tar
+*.tar

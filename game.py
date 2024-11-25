@@ -7,21 +7,21 @@ log = logging.getLogger(__name__)
 
 class Board:
     """
-    五子棋棋盘类
+    Gomoku board class
     Board data:
-    1=白棋, -1=黑棋, 0=空
+    1=white, -1=black, 0=empty
     """
 
     def __init__(self, n=15):
         self.n = n
-        # 创建空棋盘
+        # Create an empty board
         self.pieces = [[0] * n for _ in range(n)]
 
     def __getitem__(self, index):
         return self.pieces[index]
 
     def get_legal_moves(self, color):
-        """返回所有合法的落子位置"""
+        """Return all legal move positions"""
         moves = []
         for y in range(self.n):
             for x in range(self.n):
@@ -30,7 +30,7 @@ class Board:
         return moves
 
     def has_legal_moves(self):
-        """检查是否还有合法移动"""
+        """Check if there are any legal moves"""
         for y in range(self.n):
             for x in range(self.n):
                 if self[x][y] == 0:
@@ -38,22 +38,22 @@ class Board:
         return False
 
     def execute_move(self, move, color):
-        """在指定位置落子"""
+        """Place a piece on the specified position"""
         x, y = move
         self[x][y] = color
 
     def is_win(self, color):
-        """检查是否获胜"""
-        # 检查所有方向
+        """Check if there is a win"""
+        # Check all directions
         directions = [(1, 0), (0, 1), (1, 1), (1, -1)]
 
         for y in range(self.n):
             for x in range(self.n):
                 if self[x][y] == color:
-                    # 检查每个方向
+                    # Check each direction
                     for dx, dy in directions:
                         count = 1
-                        # 正向检查
+                        # Check forward
                         tx, ty = x + dx, y + dy
                         while (
                             0 <= tx < self.n
@@ -63,7 +63,7 @@ class Board:
                             count += 1
                             tx += dx
                             ty += dy
-                        # 反向检查
+                        # Check backward
                         tx, ty = x - dx, y - dy
                         while (
                             0 <= tx < self.n
@@ -126,7 +126,7 @@ class GomokuGame:
         return player * board
 
     def getSymmetries(self, board, pi):
-        # 五子棋的对称性包括旋转和翻转
+        # Gomoku's symmetries include rotation and reflection
         assert len(pi) == self.n**2
         pi_board = np.reshape(pi, (self.n, self.n))
         symmetries = []
@@ -165,8 +165,6 @@ class GomokuGame:
         for _ in range(n):
             print("-", end="-")
         print("-")
-
-
 class RandomGomokuPlayer:
     def __init__(self, game):
         self.game = game
