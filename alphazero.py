@@ -9,6 +9,7 @@ import torch.optim as optim
 from tqdm import tqdm
 from collections import deque
 from random import shuffle
+import wandb
 
 import game
 
@@ -286,7 +287,21 @@ class NNetWrapper:
                 # compute gradient and do SGD step
                 optimizer.zero_grad()
                 total_loss.backward()
-                optimizer.step()
+                
+                # Add gradient clipping
+                if self.args.grad_clip:
+                    torch.nn.utils.clip_grad_norm_(self.nnet.parameters(), self.args.grad_clip)
+                
+                self.optimizer.step()
+
+                if getattr(self.args, 'wandb', False):
+                    wandb.log({
+                        'learning_rate': lr,
+                        'policy_loss': l_pi.item(),
+                        'value_loss': l_v.item(),
+                        'total_loss': total_loss.item(),
+                        'current_step': self.current_step,
+                    })
 
     def predict(self, board):
         """
@@ -529,6 +544,27 @@ def main():
     g = game.GomokuGame(args.board_size)
 
     if args.train:
+        # Initialize wandb
+        if args.wandb:
+            wandb.init(
+                project=args.wandb_project,
+                entity=args.wandb_entity,
+                config={
+                    "board_size": args.board_size,
+                    "num_iterations": args.numIters,
+                    "num_episodes": args.numEps,
+                    "num_mcts_sims": args.numMCTSSims,
+                    "batch_size": args.batch_size,
+                    "num_channels": args.num_channels,
+                    "learning_rate_min": args.min_lr,
+                    "learning_rate_max": args.max_lr,
+                    "grad_clip": args.grad_clip,
+                    "epochs": args.epochs,
+                    "dropout": args.dropout,
+                },
+                resume="allow"
+            )
+
         nnet = NNetWrapper(g, args)
         if args.load_model:
             log.info(
