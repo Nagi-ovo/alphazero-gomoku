@@ -57,8 +57,7 @@ python alphazero.py --train
 
 ## Project Structure
 - `alphazero.py`: Main implementation including MCTS and neural network
-- `game.py`: Gomoku game logic and rules
-- `train.py`: Training pipeline with self-play and model evaluation
+- `game.py`: Gomoku game logic & rules, including board state rendering, move generation, and game end detection
 
 ## Acknowledgments
 This project is inspired by and has greatly benefited from the work of [schinger/AlphaZero](https://github.com/schinger/AlphaZero).
