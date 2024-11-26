@@ -10,6 +10,7 @@ from tqdm import tqdm
 from collections import deque
 from random import shuffle
 import wandb
+import yaml
 
 import game
 
@@ -370,6 +371,7 @@ class NNetWrapper:
         )
 
     def load_checkpoint(self, folder="checkpoint", filename="checkpoint.pth.tar"):
+        folder = folder.rstrip('/')
         filepath = os.path.join(folder, filename)
         if not os.path.exists(filepath):
             raise ValueError("No model in path {}".format(filepath))
@@ -512,38 +514,87 @@ class dotdict(dict):
         return self[name]
 
 
-args = dotdict(
-    {
-        "lr": 0.01,
-        "dropout": 0.1,
-        "epochs": 10,
-        "batch_size": 256,
-        "cuda": torch.cuda.is_available(),
-        "num_channels": 512,
-        "numIters": 200,
-        "numEps": 100,  # Number of complete self-play games to simulate during a new iteration.
-        "tempThreshold": 15,  #
-        "updateThreshold": 0.55,  # During arena playoff, new neural net will be accepted if threshold ratio or more of games are won.
-        "maxlenOfQueue": 200000,  # Number of game examples to train the neural networks.
-        "numItersForTrainExamplesHistory": 20,
-        "numMCTSSims": 400,  # Number of games moves for MCTS to simulate.
-        "arenaCompare": 40,  # Number of games to play during arena play to determine if new net will be accepted.
-        "cpuct": 1,
-        "checkpoint": "./temp/",
-        "load_model": False,
-        "load_folder_file": ("./temp/", "best.pth.tar"),
-        "board_size": 9,  # 9x9
-        "min_lr": 1e-4,           # Minimum learning rate
-        "max_lr": 1e-2,           # Maximum learning rate
-        "grad_clip": 1.0,         # Gradient clipping threshold
-    }
-)
+def load_config(config_path):
+    with open(config_path, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # Convert nested dict to dotdict
+    args = dotdict({})
+    
+    # Training params
+    args.epochs = config['training']['epochs']
+    args.batch_size = config['training']['batch_size']
+    args.numIters = config['training']['num_iterations']
+    args.numEps = config['training']['num_episodes']
+    args.maxlenOfQueue = config['training']['max_queue_length']
+    args.numItersForTrainExamplesHistory = config['training']['num_iters_history']
+    args.updateThreshold = config['training']['update_threshold']
+    args.arenaCompare = config['training']['arena_compare']
+    args.tempThreshold = config['training']['temp_threshold']
+    
+    # Network params
+    args.num_channels = config['network']['num_channels']
+    args.dropout = config['network']['dropout']
+    args.min_lr = config['network']['learning_rate']['min']
+    args.max_lr = config['network']['learning_rate']['max']
+    args.grad_clip = config['network']['grad_clip']
+    
+    # MCTS params
+    args.numMCTSSims = config['mcts']['num_sims']
+    args.cpuct = config['mcts']['cpuct']
+    
+    # Game params
+    args.board_size = config['game']['board_size']
+    
+    # System params
+    args.cuda = config['system']['cuda'] and torch.cuda.is_available()
+    args.checkpoint = config['system']['checkpoint_dir']
+    args.load_model = config['system']['load_model']
+    args.load_folder_file = tuple(config['system']['load_folder_file'])
+    
+    return args
+
+
+def print_config(args):
+    """Pretty print the configuration"""
+    print("\n=== Configuration ===")
+    print("Training Parameters:")
+    print(f"  Epochs: {args.epochs}")
+    print(f"  Batch Size: {args.batch_size}")
+    print(f"  Number of Iterations: {args.numIters}")
+    print(f"  Episodes per Iteration: {args.numEps}")
+    print(f"  Max Queue Length: {args.maxlenOfQueue}")
+    print(f"  Training History Length: {args.numItersForTrainExamplesHistory}")
+    print(f"  Update Threshold: {args.updateThreshold}")
+    print(f"  Arena Compare Games: {args.arenaCompare}")
+    print(f"  Temperature Threshold: {args.tempThreshold}")
+    
+    print("\nNetwork Parameters:")
+    print(f"  Number of Channels: {args.num_channels}")
+    print(f"  Dropout: {args.dropout}")
+    print(f"  Learning Rate Range: {args.min_lr} - {args.max_lr}")
+    print(f"  Gradient Clip: {args.grad_clip}")
+    
+    print("\nMCTS Parameters:")
+    print(f"  MCTS Simulations: {args.numMCTSSims}")
+    print(f"  CPUCT: {args.cpuct}")
+    
+    print("\nGame Parameters:")
+    print(f"  Board Size: {args.board_size}")
+    
+    print("\nSystem Parameters:")
+    print(f"  CUDA Enabled: {args.cuda}")
+    print(f"  Checkpoint Directory: {args.checkpoint}")
+    print(f"  Load Model: {args.load_model}")
+    print(f"  Load Path: {args.load_folder_file}")
+    print("==================\n")
 
 
 def main():
     import argparse
-
+    
     parser = argparse.ArgumentParser()
+    parser.add_argument("--config", type=str, default="config.yaml", help="Path to config file")
     parser.add_argument("--train", action="store_true")
     parser.add_argument("--board_size", type=int, default=9)
     # play arguments
@@ -569,9 +620,16 @@ def main():
     parser.add_argument("--wandb_id", type=str, default=None)
     
     args_input = vars(parser.parse_args())
+    
+    # Load config and override with command line arguments
+    args = load_config(args_input['config'])
     for k, v in args_input.items():
-        args[k] = v
-
+        if k != 'config':
+            args[k] = v
+    
+    # Add this line to print configuration
+    print_config(args)
+    
     g = game.GomokuGame(args.board_size)
 
     if args.train:

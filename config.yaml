@@ -1,0 +1,36 @@
+# Training parameters
+training:
+  epochs: 10
+  batch_size: 256
+  num_iterations: 200  # numIters
+  num_episodes: 100    # numEps
+  max_queue_length: 200000  # maxlenOfQueue
+  num_iters_history: 20     # numItersForTrainExamplesHistory
+  update_threshold: 0.55
+  arena_compare: 40
+  temp_threshold: 15
+
+# Neural Network parameters
+network:
+  num_channels: 512
+  dropout: 0.1
+  learning_rate:
+    min: 1.0e-4
+    max: 1.0e-2
+  grad_clip: 1.0
+
+# MCTS parameters
+mcts:
+  num_sims: 800  # numMCTSSims
+  cpuct: 4.0
+
+# Game parameters
+game:
+  board_size: 9
+
+# System parameters
+system:
+  cuda: true  # Will be overridden by torch.cuda.is_available()
+  checkpoint_dir: "./temp"
+  load_model: False
+  load_folder_file: ["./temp", "best.pth.tar"] 
