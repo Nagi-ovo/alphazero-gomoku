@@ -630,11 +630,9 @@ def main():
 
         player1 = getPlayFunc(args.player1)
         player2 = getPlayFunc(args.player2)
-        arena = game.Arena(player1, player2, g, display=game.GomokuGame.display)
+        arena = game.Arena(player1, player2, g, display=lambda x: None)
         results = arena.playGames(args.round, verbose=args.verbose)
-        print(
-            "Final results: Player1 wins {}, Player2 wins {}, Draws {}".format(*results)
-        )
+        print("Final results: Player1 wins {}, Player2 wins {}, Draws {}".format(*results))
 
 
 if __name__ == "__main__":

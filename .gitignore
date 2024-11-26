@@ -8,3 +8,4 @@ output.txt
 *.pt
 *.pth.tar
 *.tar
+hg_token

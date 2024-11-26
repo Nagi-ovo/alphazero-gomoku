@@ -12,7 +12,7 @@ An implementation of the AlphaZero algorithm for the game of Gomoku (Five in a R
 ## Installation
 
 ```bash
-pip install torch numpy tqdm wandb
+pip install torch numpy tqdm wandb pygame
 ```
 
 ## Usage

@@ -1,6 +1,8 @@
 import numpy as np
 import logging
 from tqdm import tqdm
+import pygame
+import sys
 
 log = logging.getLogger(__name__)
 
@@ -97,7 +99,8 @@ class GomokuGame:
     def getNextState(self, board, player, action):
         b = Board(self.n)
         b.pieces = np.copy(board)
-        move = (int(action / self.n), action % self.n)
+        # Fix: Ensure consistent coordinate transformation
+        move = (action // self.n, action % self.n)  # This gives (x, y)
         b.execute_move(move, player)
         return (b.pieces, -player)
 
@@ -107,6 +110,7 @@ class GomokuGame:
         valids = [0] * self.getActionSize()
         legalMoves = b.get_legal_moves(player)
         for x, y in legalMoves:
+            # Fix: Ensure consistent coordinate transformation
             valids[self.n * x + y] = 1
         return np.array(valids)
 
@@ -146,25 +150,72 @@ class GomokuGame:
 
     @staticmethod
     def display(board):
-        n = board.shape[0]
-        print("   ", end="")
-        for y in range(n):
-            print(y, end=" ")
-        print("")
-        print("  ", end="")
-        for _ in range(n):
-            print("-", end="-")
-        print("-")
-        for y in range(n):
-            print(f"{y:2d}|", end="")
-            for x in range(n):
-                piece = board[y][x]
-                print(GomokuGame.square_content[piece], end=" ")
-            print("|")
-        print("  ", end="")
-        for _ in range(n):
-            print("-", end="-")
-        print("-")
+        """Update the GUI display"""
+        if not hasattr(GomokuGame, 'gui'):
+            GomokuGame.gui = GomokuGUI(len(board))
+        GomokuGame.gui.draw_board(board)
+        pygame.display.flip()
+        pygame.time.wait(500)  # Add delay to make the game more visible
+
+
+class GomokuGUI:
+    def __init__(self, board_size):
+        pygame.init()
+        self.board_size = board_size
+        self.cell_size = 40
+        self.margin = 40
+        
+        # Calculate window size based on board size
+        self.window_size = 2 * self.margin + self.cell_size * (self.board_size - 1)
+        self.screen = pygame.display.set_mode((self.window_size, self.window_size))
+        pygame.display.set_caption("AlphaZero Gomoku")
+        
+        # Colors
+        self.BLACK = (0, 0, 0)
+        self.WHITE = (255, 255, 255)
+        self.BROWN = (205, 170, 125)
+        self.RED = (255, 0, 0)
+        
+        # Font
+        self.font = pygame.font.Font(None, 24)
+
+    def get_mouse_position(self):
+        """Convert mouse position to board coordinates"""
+        x, y = pygame.mouse.get_pos()
+        board_x = int((x - self.margin + self.cell_size/2) / self.cell_size)
+        board_y = int((y - self.margin + self.cell_size/2) / self.cell_size)
+        if 0 <= board_x < self.board_size and 0 <= board_y < self.board_size:
+            return board_x, board_y
+        return None
+
+    def draw_board(self, board):
+        # Fill background
+        self.screen.fill(self.BROWN)
+        
+        # Draw grid lines
+        for i in range(self.board_size):
+            # Vertical lines
+            start_pos = (self.margin + i * self.cell_size, self.margin)
+            end_pos = (self.margin + i * self.cell_size, self.margin + (self.board_size-1) * self.cell_size)
+            pygame.draw.line(self.screen, self.BLACK, start_pos, end_pos)
+            
+            # Horizontal lines
+            start_pos = (self.margin, self.margin + i * self.cell_size)
+            end_pos = (self.margin + (self.board_size-1) * self.cell_size, self.margin + i * self.cell_size)
+            pygame.draw.line(self.screen, self.BLACK, start_pos, end_pos)
+        
+        # Draw stones
+        for y in range(self.board_size):
+            for x in range(self.board_size):
+                if board[x][y] != 0:
+                    center = (
+                        self.margin + y * self.cell_size,
+                        self.margin + x * self.cell_size
+                    )
+                    color = self.WHITE if board[x][y] == 1 else self.BLACK
+                    pygame.draw.circle(self.screen, color, center, self.cell_size // 2 - 2)
+
+
 class RandomGomokuPlayer:
     def __init__(self, game):
         self.game = game
@@ -197,32 +248,29 @@ class GreedyGomokuPlayer:
 class HumanGomokuPlayer:
     def __init__(self, game):
         self.game = game
+        self.gui = GomokuGUI(game.n)
 
     def play(self, board):
-        # display(board)
         valid = self.game.getValidMoves(board, 1)
-        for i in range(len(valid)):
-            if valid[i]:
-                print("[", int(i / self.game.n), int(i % self.game.n), end="] ")
+        self.gui.draw_board(board)
+        
         while True:
-            input_move = input()
-            input_a = input_move.split(" ")
-            if len(input_a) == 2:
-                try:
-                    x, y = [int(i) for i in input_a]
-                    if (
-                        (0 <= x)
-                        and (x < self.game.n)
-                        and (0 <= y)
-                        and (y < self.game.n)
-                    ) or ((x == self.game.n) and (y == 0)):
-                        a = self.game.n * x + y
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                    
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    pos = self.gui.get_mouse_position()
+                    if pos:
+                        x, y = pos
+                        # Fix: Swap x and y to match the game's internal representation
+                        a = self.game.n * y + x  # Changed from n * x + y
                         if valid[a]:
-                            break
-                except ValueError:
-                    "Invalid integer"
-            print("Invalid move")
-        return a
+                            pygame.display.flip()
+                            return a
+            
+            pygame.display.flip()
 
 
 class Arena:
