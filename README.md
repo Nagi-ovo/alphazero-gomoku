@@ -2,6 +2,9 @@
 
 An implementation of the AlphaZero algorithm for the game of Gomoku (Five in a Row), featuring self-play reinforcement learning and Monte Carlo Tree Search.
 
+50 iterations loss curve(mcts_sims=400, cpuct=1.0):
+![loss_curve](assets/total_loss.png)
+
 ## Key Features
 - Complete AlphaZero algorithm implementation with MCTS and policy-value network
 - Self-play training with experience replay buffer
@@ -26,6 +29,8 @@ python alphazero.py --play \
     --ckpt_file=best.pth.tar \
     --verbose
 ```
+![demo](assets/demo.png)
+
 - Random player vs. Alphazero:
 
 ```bash
