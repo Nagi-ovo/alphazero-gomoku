@@ -149,25 +149,27 @@ class GomokuGame:
         return board.tostring()
 
     @staticmethod
-    def display(board):
+    def display(board, player1_first=True):
         """Update the GUI display"""
         if not hasattr(GomokuGame, 'gui'):
-            GomokuGame.gui = GomokuGUI(len(board))
-        GomokuGame.gui.draw_board(board)
+            GomokuGame.gui = GomokuGUI(len(board), player1_first)
+        GomokuGame.gui.draw_board(board, player1_first)
         pygame.display.flip()
-        pygame.time.wait(500)  # Add delay to make the game more visible
 
 
 class GomokuGUI:
-    def __init__(self, board_size):
+    def __init__(self, board_size, player1_first=True):
         pygame.init()
         self.board_size = board_size
         self.cell_size = 40
         self.margin = 40
         
-        # Calculate window size based on board size
+        # Add space at the bottom for buttons and result text
+        self.bottom_margin = 80  # Space for buttons at bottom
+        
+        # Calculate window size with bottom margin
         self.window_size = 2 * self.margin + self.cell_size * (self.board_size - 1)
-        self.screen = pygame.display.set_mode((self.window_size, self.window_size))
+        self.screen = pygame.display.set_mode((self.window_size, self.window_size + self.bottom_margin))
         pygame.display.set_caption("AlphaZero Gomoku")
         
         # Colors
@@ -178,6 +180,26 @@ class GomokuGUI:
         
         # Font
         self.font = pygame.font.Font(None, 24)
+        
+        # Add button properties
+        self.button_height = 30
+        self.button_width = 100
+        self.button_margin = 10
+        
+        # Position buttons at the bottom
+        self.next_button = pygame.Rect(
+            self.window_size - self.button_width - self.button_margin,
+            self.window_size + (self.bottom_margin - self.button_height) // 2,
+            self.button_width,
+            self.button_height
+        )
+        self.quit_button = pygame.Rect(
+            self.window_size - 2 * self.button_width - 2 * self.button_margin,
+            self.window_size + (self.bottom_margin - self.button_height) // 2,
+            self.button_width,
+            self.button_height
+        )
+        self.player1_first = player1_first
 
     def get_mouse_position(self):
         """Convert mouse position to board coordinates"""
@@ -188,7 +210,7 @@ class GomokuGUI:
             return board_x, board_y
         return None
 
-    def draw_board(self, board):
+    def draw_board(self, board, player1_first=True):
         # Fill background
         self.screen.fill(self.BROWN)
         
@@ -212,8 +234,56 @@ class GomokuGUI:
                         self.margin + y * self.cell_size,
                         self.margin + x * self.cell_size
                     )
-                    color = self.WHITE if board[x][y] == 1 else self.BLACK
+                    # Adjust color based on player order
+                    if player1_first:
+                        color = self.WHITE if board[x][y] == 1 else self.BLACK
+                    else:
+                        color = self.BLACK if board[x][y] == 1 else self.WHITE
                     pygame.draw.circle(self.screen, color, center, self.cell_size // 2 - 2)
+
+    def draw_game_over(self, result, is_final_round=False):
+        """Draw game over message and control buttons"""
+        # Clear the bottom area first
+        pygame.draw.rect(self.screen, self.BROWN, 
+                        (0, self.window_size, self.window_size, self.bottom_margin))
+        
+        # Draw result message - moved up by adjusting the vertical position
+        if result == 1:
+            msg = "You Win!"
+        elif result == -1:
+            msg = "AI Wins!"
+        else:
+            msg = "Draw!"
+        
+        text = self.font.render(msg, True, self.RED)
+        text_rect = text.get_rect(
+            center=(self.window_size // 2, 
+                   self.window_size + self.bottom_margin // 10)  # button and text position fixed...
+        )
+        self.screen.blit(text, text_rect)
+        
+        # Draw buttons (position unchanged)
+        if not is_final_round:
+            pygame.draw.rect(self.screen, self.WHITE, self.next_button)
+            next_text = self.font.render("Next Game", True, self.BLACK)
+            next_text_rect = next_text.get_rect(center=self.next_button.center)
+            self.screen.blit(next_text, next_text_rect)
+        
+        pygame.draw.rect(self.screen, self.WHITE, self.quit_button)
+        quit_text = self.font.render("Quit", True, self.BLACK)
+        quit_text_rect = quit_text.get_rect(center=self.quit_button.center)
+        self.screen.blit(quit_text, quit_text_rect)
+
+    def handle_game_over_input(self):
+        """Handle button clicks after game over"""
+        mouse_pos = pygame.mouse.get_pos()
+        
+        if pygame.mouse.get_pressed()[0]:  # Left click
+            if self.next_button.collidepoint(mouse_pos):
+                return "next"
+            elif self.quit_button.collidepoint(mouse_pos):
+                return "quit"
+        return None
 
 
 class RandomGomokuPlayer:
@@ -290,6 +360,9 @@ class Arena:
         self.player2 = player2
         self.game = game
         self.display = display
+        self.player1_first = True # Track original player order
+        self.current_round = 0
+        self.total_rounds = 0  # Will be set in playGames
 
     def playGame(self, verbose=False):
         """
@@ -300,15 +373,22 @@ class Arena:
                 winner: player who won the game (1 if player1, -1 if player2, 0 if draw)
         """
         players = [self.player2, None, self.player1]
-        curPlayer = 1  # player1 go first
+        curPlayer = 1
         board = self.game.getInitBoard()
+        
+        # Reset GUI for new game if it exists
+        if hasattr(self.game, 'gui'):
+            # Pass player order information to GUI
+            self.game.gui = GomokuGUI(len(board), self.player1_first)
+        
         it = 0
         while self.game.getGameEnded(board, curPlayer) is None:
             it += 1
             if verbose:
                 assert self.display
                 print("Turn ", str(it), "Player ", str(curPlayer))
-                self.display(board)
+                self.display(board, self.player1_first)  # Pass player order information
+            
             action = players[curPlayer + 1](
                 self.game.getCanonicalForm(board, curPlayer)
             )
@@ -321,29 +401,60 @@ class Arena:
                 log.error(f"Action {action} is not valid!")
                 log.debug(f"valids = {valids}")
                 assert valids[action] > 0
+            
             board, curPlayer = self.game.getNextState(board, curPlayer, action)
-        result = curPlayer * self.game.getGameEnded(board, curPlayer)
+        
         if verbose:
             assert self.display
-            print("Game over: Turn ", str(it), "Result ", str(result))
-            self.display(board)
-        return result
+            print("Game over: Turn ", str(it), "Result ", str(curPlayer))
+            self.display(board, self.player1_first)  # Pass player order information
+            
+            if hasattr(self.game, 'gui'):
+                result = curPlayer * self.game.getGameEnded(board, curPlayer)
+                if not self.player1_first:
+                    result = -result
+                
+                # Check if this is the final round
+                self.current_round += 1
+                is_final_round = (self.current_round >= self.total_rounds)
+                
+                self.game.gui.draw_game_over(result, is_final_round)
+                pygame.display.flip()
+                
+                while True:
+                    for event in pygame.event.get():
+                        if event.type == pygame.QUIT:
+                            pygame.quit()
+                            sys.exit()
+                    
+                    action = self.game.gui.handle_game_over_input()
+                    if action == "next" and not is_final_round:
+                        break
+                    elif action == "quit":
+                        pygame.quit()
+                        sys.exit()
+                    
+                    pygame.display.flip()
+        
+        return curPlayer * self.game.getGameEnded(board, curPlayer)
 
     def playGames(self, num, verbose=False):
         """
-        Plays num games in which player1 starts num/2 games and player2 starts
-        num/2 games.
+        Plays num games in which player1 starts num/2 games and player2 starts num/2 games.
 
         Returns:
             oneWon: games won by player1
             twoWon: games won by player2
             draws:  games won by nobody
         """
-
+        self.total_rounds = num
+        self.current_round = 0
         num = int(num / 2)
         oneWon = 0
         twoWon = 0
         draws = 0
+
+        self.player1_first = True  # First half: player1 goes first
         for _ in tqdm(range(num), desc="Arena.playGames (player1 go first)"):
             gameResult = self.playGame(verbose=verbose)
             if gameResult == 1:
@@ -354,6 +465,7 @@ class Arena:
                 draws += 1
 
         self.player1, self.player2 = self.player2, self.player1
+        self.player1_first = False  # Second half: original player2 goes first
 
         for _ in tqdm(range(num), desc="Arena.playGames (player2 go first)"):
             gameResult = self.playGame(verbose=verbose)
