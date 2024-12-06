@@ -2,8 +2,12 @@
 
 An implementation of the AlphaZero algorithm for the game of Gomoku (Five in a Row), featuring self-play reinforcement learning and Monte Carlo Tree Search.
 
-50 iterations loss curve(mcts_sims=400, cpuct=1.0):
+Training Loss Curve over 50 Iterations:
+- Initial Training: MCTS simulations=400, cpuct=1.0
+
 ![loss_curve](assets/total_loss.png)
+
+The final model was further refined with increased MCTS simulations (4000) to achieve better performance.
 
 ## Key Features
 - Complete AlphaZero algorithm implementation with MCTS and policy-value network
@@ -17,7 +21,7 @@ An implementation of the AlphaZero algorithm for the game of Gomoku (Five in a R
 ```bash
 pip install torch numpy tqdm wandb pygame
 ```
-
+You can download the best pre-trained model so far from [my huggingface repo](https://huggingface.co/Nagi-ovo/alphazero-gomoku) and put it in the `temp` folder.
 ## Usage
 
 ### Play Against Trained Model
@@ -31,25 +35,10 @@ python alphazero.py --play \
 ```
 ![demo](assets/demo.png)
 
-- Random player vs. Alphazero:
-
-```bash
-python alphazero.py --play --round=100 --player1=random --ckpt_file=best.pth.tar
-``` 
-- Greedy player vs. Alphazero:
-
-```bash
-python alphazero.py --play --round=100 --player1=greedy --ckpt_file=best.pth.tar
-```
-- Alphazero vs. Alphazero: 
-
-```bash
-python alphazero.py --play --round=100 --player1=alphazero --ckpt_file=best.pth.tar
-```
 
 ### Train from Scratch
 ```bash
-python alphazero.py --train
+python alphazero.py --train --wandb
 ```
 
 ### Key Parameters
