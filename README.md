@@ -53,6 +53,10 @@ python alphazero.py --train --wandb
 - `alphazero.py`: Main implementation including MCTS and neural network
 - `game.py`: Gomoku game logic & rules, including board state rendering, move generation, and game end detection
 
+## Blog & Tutorial
+
+[alphazero-from-scratch](https://blog.nagi.fun/alphazero)
+
 ## Acknowledgments
 This project is inspired by and has greatly benefited from the work of [schinger/AlphaZero](https://github.com/schinger/AlphaZero).
 
