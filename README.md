@@ -2,12 +2,10 @@
 
 An implementation of the AlphaZero algorithm for the game of Gomoku (Five in a Row), featuring self-play reinforcement learning and Monte Carlo Tree Search.
 
-Training Loss Curve over 50 Iterations:
-- Initial Training: MCTS simulations=400, cpuct=1.0
+Training Loss Curve over 22 Iterations, last for 4 days on a single RTX 3090 Ti:
 
-![loss_curve](assets/total_loss.png)
-
-The final model was further refined with increased MCTS simulations (4000) to achieve better performance.
+![loss_curve](assets/wandb.png)
+> MCTS simulations=2000, cpuct=4.0
 
 ## Key Features
 - Complete AlphaZero algorithm implementation with MCTS and policy-value network
